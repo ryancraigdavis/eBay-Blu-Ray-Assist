@@ -10,6 +10,7 @@ class Settings:
 
     # TMDB API Configuration
     TMDB_API_KEY: Optional[str] = os.getenv("TMDB_API_KEY")
+    TMDB_READ_TOKEN: Optional[str] = os.getenv("TMDB_READ_TOKEN")
     TMDB_BASE_URL: str = "https://api.themoviedb.org/3"
 
     # Application settings

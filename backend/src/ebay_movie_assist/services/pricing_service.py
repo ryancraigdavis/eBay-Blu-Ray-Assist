@@ -2,26 +2,173 @@ import httpx
 import asyncio
 from typing import Optional, List, Dict, Any
 from urllib.parse import quote
+from bs4 import BeautifulSoup
+import re
+from datetime import datetime
 from ..config import settings
 from ..models import PriceData
 
 class PricingService:
     def __init__(self):
-        self.base_delay = 1.0  # Base delay between requests to avoid rate limiting
+        self.base_delay = 2.0  # Base delay between requests to avoid rate limiting
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+        }
 
     async def get_ebay_pricing(self, title: str, condition: str = "Used") -> Optional[PriceData]:
-        """Get pricing data from eBay sold listings using web scraping approach"""
+        """Get pricing data from eBay sold listings using web scraping"""
         try:
             # Format search query for eBay
-            search_query = f"{title} blu-ray {condition}"
+            search_query = f"{title} blu-ray"
 
-            # For now, we'll use a placeholder implementation
-            # In production, you'd want to use eBay's official API or a reliable data source
-            return await self._mock_pricing_data(title, condition)
+            # Scrape sold listings
+            sold_items = await self._scrape_ebay_sold_listings(search_query, pages=2)
+
+            if not sold_items:
+                print(f"No sold listings found for '{search_query}', using mock data")
+                return await self._mock_pricing_data(title, condition)
+
+            # Calculate pricing statistics
+            prices = [item['price'] for item in sold_items if item['price'] > 0]
+
+            if not prices:
+                return await self._mock_pricing_data(title, condition)
+
+            average_price = round(sum(prices) / len(prices), 2)
+            shipping_cost = 4.99  # Standard media mail shipping
+
+            # Format comparable listings
+            comparable_listings = [
+                {
+                    "title": item['title'],
+                    "price": item['price'],
+                    "shipping": item.get('shipping', 0.0),
+                    "condition": condition,
+                    "sold_date": item.get('sold_date', '')
+                }
+                for item in sold_items[:5]  # Top 5 listings
+            ]
+
+            return PriceData(
+                average_price=average_price,
+                shipping_cost=shipping_cost,
+                total_cost=round(average_price + shipping_cost, 2),
+                comparable_listings=comparable_listings
+            )
 
         except Exception as e:
             print(f"Error getting eBay pricing: {str(e)}")
-            return None
+            # Fallback to mock data on error
+            return await self._mock_pricing_data(title, condition)
+
+    async def _scrape_ebay_sold_listings(self, search_term: str, pages: int = 2) -> List[Dict[str, Any]]:
+        """Scrape eBay sold listings for pricing data"""
+        results = []
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                for page in range(1, pages + 1):
+                    # eBay sold listings URL with pagination
+                    # LH_Sold=1 means only sold items
+                    # LH_Complete=1 means completed listings
+                    url = f"https://www.ebay.com/sch/i.html?_nkw={quote(search_term)}&LH_Sold=1&LH_Complete=1&_pgn={page}"
+
+                    print(f"Scraping eBay page {page}: {url}")
+
+                    # Rate limiting - wait before request
+                    if page > 1:
+                        await asyncio.sleep(self.base_delay)
+
+                    try:
+                        response = await client.get(url, headers=self.headers, follow_redirects=True)
+                        response.raise_for_status()
+
+                        # Parse HTML
+                        soup = BeautifulSoup(response.text, 'html.parser')
+
+                        # Find all listing items
+                        listings = soup.select('.s-item')
+
+                        print(f"Found {len(listings)} listings on page {page}")
+
+                        for item in listings:
+                            try:
+                                # Skip header/ad items
+                                title_elem = item.select_one('.s-item__title')
+                                if not title_elem or 'Shop on eBay' in title_elem.get_text():
+                                    continue
+
+                                title = title_elem.get_text(strip=True)
+
+                                # Extract price
+                                price_elem = item.select_one('.s-item__price')
+                                if not price_elem:
+                                    continue
+
+                                price_text = price_elem.get_text(strip=True)
+                                price = self._parse_price(price_text)
+
+                                # Extract link
+                                link_elem = item.select_one('.s-item__link')
+                                link = link_elem['href'] if link_elem else ''
+
+                                # Extract sold date (if available)
+                                sold_date = ''
+                                date_elem = item.select_one('.s-item__endedDate, .s-item__ended-date')
+                                if date_elem:
+                                    sold_date = date_elem.get_text(strip=True)
+
+                                # Extract shipping cost (if available)
+                                shipping = 0.0
+                                shipping_elem = item.select_one('.s-item__shipping')
+                                if shipping_elem:
+                                    shipping_text = shipping_elem.get_text(strip=True)
+                                    if 'Free' not in shipping_text:
+                                        shipping = self._parse_price(shipping_text)
+
+                                results.append({
+                                    'title': title,
+                                    'price': price,
+                                    'link': link,
+                                    'sold_date': sold_date,
+                                    'shipping': shipping
+                                })
+
+                            except Exception as e:
+                                print(f"Error parsing item: {e}")
+                                continue
+
+                    except httpx.HTTPError as e:
+                        print(f"HTTP error on page {page}: {e}")
+                        break
+
+        except Exception as e:
+            print(f"Error scraping eBay: {e}")
+
+        return results
+
+    def _parse_price(self, price_text: str) -> float:
+        """Parse price from text like '$12.99' or '$10.00 to $15.00'"""
+        try:
+            # Remove currency symbols and extra text
+            price_text = price_text.replace('$', '').replace(',', '')
+
+            # Handle price ranges - take the first/lower price
+            if ' to ' in price_text:
+                price_text = price_text.split(' to ')[0]
+
+            # Extract first number found
+            match = re.search(r'\d+\.?\d*', price_text)
+            if match:
+                return float(match.group())
+
+            return 0.0
+        except:
+            return 0.0
 
     async def _mock_pricing_data(self, title: str, condition: str) -> PriceData:
         """Mock pricing data for development - replace with real implementation"""

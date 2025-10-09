@@ -5,13 +5,13 @@ from ..models import MovieMetadata
 
 class TMDBService:
     def __init__(self):
-        if not settings.TMDB_API_KEY:
-            raise ValueError("TMDB API key must be configured")
+        if not settings.TMDB_READ_TOKEN:
+            raise ValueError("TMDB Read Token must be configured")
 
-        self.api_key = settings.TMDB_API_KEY
+        self.read_token = settings.TMDB_READ_TOKEN
         self.base_url = settings.TMDB_BASE_URL
         self.headers = {
-            'Authorization': f'Bearer {self.api_key}',
+            'Authorization': f'Bearer {self.read_token}',
             'Content-Type': 'application/json;charset=utf-8'
         }
 
@@ -142,4 +142,4 @@ class TMDBService:
             print(f"Error finding movie by IMDB ID: {str(e)}")
             return None
 
-tmdb_service = TMDBService() if settings.TMDB_API_KEY else None
+tmdb_service = TMDBService() if settings.TMDB_READ_TOKEN else None

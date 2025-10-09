@@ -1,16 +1,22 @@
 import pandas as pd
 import os
+import glob
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from ..models import BlurayItem, MovieMetadata, PriceData
 
 class TemplateService:
     def __init__(self):
-        self.template_path = os.path.join(
+        template_dir = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "template",
-            "eBay-category-listing-template-Sep-27-2025-11-50-48.csv"
+            "template"
         )
+        # Find the first eBay template CSV file in the directory
+        template_files = glob.glob(os.path.join(template_dir, "eBay-category-listing-template-*.csv"))
+        if not template_files:
+            raise ValueError(f"No eBay template CSV found in {template_dir}")
+        # Use the most recently modified template file
+        self.template_path = max(template_files, key=os.path.getmtime)
 
     def load_template(self) -> pd.DataFrame:
         """Load the eBay template CSV"""
