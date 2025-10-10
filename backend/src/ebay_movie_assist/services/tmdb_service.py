@@ -68,6 +68,14 @@ class TMDBService:
                 credits_response.raise_for_status()
                 credits_data = credits_response.json()
 
+                # Get US certification (MPAA rating)
+                cert_response = await client.get(
+                    f"{self.base_url}/movie/{movie_id}/release_dates",
+                    headers=self.headers
+                )
+                cert_response.raise_for_status()
+                cert_data = cert_response.json()
+
                 # Extract director
                 director = None
                 for crew_member in credits_data.get('crew', []):
@@ -86,8 +94,8 @@ class TMDBService:
                 if movie_data.get('production_companies'):
                     studio = movie_data['production_companies'][0]['name']
 
-                # Convert TMDB rating to MPAA rating (this is approximate)
-                rating = self._convert_to_mpaa_rating(movie_data.get('adult', False))
+                # Get US MPAA rating from certifications
+                rating = self._extract_us_rating(cert_data) or self._convert_to_mpaa_rating(movie_data.get('adult', False))
 
                 # Build poster URL
                 poster_url = None
@@ -112,9 +120,20 @@ class TMDBService:
             print(f"Error getting movie details: {str(e)}")
             raise
 
+    def _extract_us_rating(self, cert_data: dict) -> Optional[str]:
+        """Extract US MPAA rating from certification data"""
+        try:
+            for result in cert_data.get('results', []):
+                if result.get('iso_3166_1') == 'US':
+                    for release in result.get('release_dates', []):
+                        if release.get('certification'):
+                            return release['certification']
+            return None
+        except:
+            return None
+
     def _convert_to_mpaa_rating(self, is_adult: bool) -> str:
-        """Convert TMDB adult flag to approximate MPAA rating"""
-        # This is a very basic conversion - in practice, you'd need additional data
+        """Convert TMDB adult flag to approximate MPAA rating (fallback)"""
         return "R" if is_adult else "PG-13"
 
     async def get_movie_by_imdb_id(self, imdb_id: str) -> Optional[MovieMetadata]:

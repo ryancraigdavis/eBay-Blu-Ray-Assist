@@ -7,11 +7,24 @@ from ..services.template_service import template_service
 
 router = APIRouter(prefix="/process", tags=["process"])
 
-@router.post("/metadata", response_model=MovieMetadata)
+@router.get("/metadata", response_model=MovieMetadata)
 async def get_movie_metadata(title: str, year: int = None):
     """Get movie metadata from TMDB"""
+    # If TMDB service not configured, return mock data
     if not tmdb_service:
-        raise HTTPException(status_code=500, detail="TMDB service not configured")
+        return MovieMetadata(
+            title=title,
+            original_title=title,
+            release_date=f"{year or 2020}-01-01",
+            genres=["Action", "Thriller"],
+            director="Unknown Director",
+            actors=["Actor 1", "Actor 2", "Actor 3"],
+            studio="Universal Pictures",
+            rating="PG-13",
+            runtime=120,
+            overview=f"This is a mock overview for {title}. TMDB credentials are not configured.",
+            poster_url=None
+        )
 
     try:
         metadata = await tmdb_service.search_movie(title, year)

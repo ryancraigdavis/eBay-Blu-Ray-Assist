@@ -47,9 +47,13 @@ class S3Service:
                           optimize: bool = True) -> UploadResponse:
         """Upload image to S3 bucket"""
         try:
-            # Generate unique filename
+            # Generate unique filename with UUID prefix + original name
+            # Clean the original filename (remove spaces, special chars)
+            import re
+            clean_name = re.sub(r'[^\w\-.]', '_', filename.lower())
             file_extension = filename.split('.')[-1] if '.' in filename else 'jpg'
-            unique_filename = f"bluray-images/{uuid.uuid4()}.{file_extension}"
+            unique_id = str(uuid.uuid4())[:8]  # Use first 8 chars of UUID
+            unique_filename = f"bluray-images/{unique_id}-{clean_name}"
 
             # Optimize image if requested
             if optimize and content_type.startswith('image/'):
@@ -57,12 +61,12 @@ class S3Service:
                 content_type = 'image/jpeg'
 
             # Upload to S3
+            # Note: Bucket should be configured with public access policy instead of ACLs
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
                 Key=unique_filename,
                 Body=file_content,
-                ContentType=content_type,
-                ACL='public-read'  # Make images publicly accessible
+                ContentType=content_type
             )
 
             # Generate public URL
