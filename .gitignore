@@ -264,7 +264,7 @@ ehthumbs.db
 Desktop.ini
 
 # eBay Template (contains sensitive data structure)
-backend/src/ebay_movie_assist/template/eBay-category-listing-template-Sep-27-2025-11-50-48.csv
+backend/src/ebay_movie_assist/template/**
 
 # Generated CSV files
 *.csv

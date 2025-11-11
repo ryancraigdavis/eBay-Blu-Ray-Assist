@@ -1,5 +1,5 @@
 <script>
-	let { image, movieIndex } = $props();
+	let { image, movieIndex, onSubmit } = $props();
 
 	const API_BASE = 'http://localhost:8000';
 
@@ -51,8 +51,11 @@
 	let errors = {
 		metadata: '',
 		pricing: '',
-		upload: ''
+		upload: '',
+		submit: ''
 	};
+
+	let isSubmitted = $state(false);
 
 	async function fetchMetadata() {
 		loading.metadata = true;
@@ -192,6 +195,86 @@
 
 		return desc;
 	}
+
+	function validateForm() {
+		const validationErrors = [];
+
+		if (!formData.title?.trim()) {
+			validationErrors.push('Listing title is required');
+		}
+
+		if (!formData.s3Url) {
+			validationErrors.push('Please upload image to AWS first');
+		}
+
+		if (!formData.price || parseFloat(formData.price) <= 0) {
+			validationErrors.push('Valid price is required');
+		}
+
+		if (!formData.quantity || parseInt(formData.quantity) <= 0) {
+			validationErrors.push('Valid quantity is required');
+		}
+
+		return validationErrors;
+	}
+
+	function transformToBluerayItem() {
+		return {
+			title: formData.title,
+			condition: formData.condition,
+			photos: [formData.s3Url],
+			metadata: {
+				title: formData.movieTitle || formData.title,
+				release_date: formData.releaseYear ? `${formData.releaseYear}-01-01` : null,
+				genres: [formData.genre, formData.subGenre].filter(Boolean),
+				director: formData.director,
+				actors: formData.actors ? formData.actors.split(',').map(a => a.trim()) : [],
+				studio: formData.studio,
+				rating: formData.rating,
+				runtime: formData.runtime ? parseInt(formData.runtime) : null,
+				overview: null
+			},
+			price_data: {
+				average_price: formData.averagePrice ? parseFloat(formData.averagePrice) : null,
+				shipping_cost: formData.shippingCost ? parseFloat(formData.shippingCost) : null,
+				total_cost: formData.totalCost ? parseFloat(formData.totalCost) : null,
+				comparable_listings: []
+			},
+			user_notes: formData.userNotes,
+			custom_fields: {
+				price: parseFloat(formData.price),
+				quantity: parseInt(formData.quantity),
+				description: formData.description,
+				location: formData.location,
+				region_code: formData.regionCode,
+				language: formData.language,
+				case_type: formData.caseType,
+				features: formData.features
+			}
+		};
+	}
+
+	function handleSubmit() {
+		errors.submit = '';
+
+		// Validate form
+		const validationErrors = validateForm();
+		if (validationErrors.length > 0) {
+			errors.submit = validationErrors.join('; ');
+			return;
+		}
+
+		// Transform to BlurayItem
+		const item = transformToBluerayItem();
+
+		// Mark as submitted
+		isSubmitted = true;
+
+		// Call parent callback
+		if (onSubmit) {
+			onSubmit(item);
+		}
+	}
 </script>
 
 <style>
@@ -303,10 +386,38 @@
 		cursor: not-allowed;
 	}
 
+	.btn-submit {
+		background: #17a2b8;
+		color: white;
+		font-size: 16px;
+		padding: 12px 30px;
+	}
+
+	.btn-submit:hover:not(:disabled) {
+		background: #138496;
+	}
+
 	.error {
 		color: #dc3545;
 		font-size: 12px;
 		margin-top: 5px;
+	}
+
+	.submit-section {
+		margin-top: 20px;
+		padding: 20px;
+		background: #f8f9fa;
+		border-radius: 8px;
+		border: 2px solid #17a2b8;
+	}
+
+	.submit-success {
+		background: #d4edda;
+		border-color: #28a745;
+		padding: 15px;
+		border-radius: 4px;
+		color: #155724;
+		text-align: center;
 	}
 
 	.success-indicator {
@@ -641,4 +752,28 @@
 			></textarea>
 		</div>
 	</div>
+
+	<!-- Submit Section -->
+	{#if !isSubmitted}
+		<div class="submit-section">
+			<h3>Ready to Submit?</h3>
+			<p>Make sure you've uploaded the image to AWS and filled out all required fields.</p>
+			<button
+				class="btn btn-submit"
+				on:click={handleSubmit}
+			>
+				Submit & Next
+			</button>
+			{#if errors.submit}
+				<div class="error" style="margin-top: 10px; font-size: 14px;">
+					<strong>Error:</strong> {errors.submit}
+				</div>
+			{/if}
+		</div>
+	{:else}
+		<div class="submit-success">
+			<h3>✓ Item Submitted Successfully!</h3>
+			<p>This item will be included in your CSV export.</p>
+		</div>
+	{/if}
 </div>
