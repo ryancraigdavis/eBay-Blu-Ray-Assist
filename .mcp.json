@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ebay-bluray": {
+      "command": "doppler",
+      "args": ["run", "--config", "prd", "--", "uv", "run", "ebay-bluray-mcp"],
+      "cwd": "/home/ryan/projects/eBay-Blu-Ray-Assist/mcp-server"
+    }
+  }
+}

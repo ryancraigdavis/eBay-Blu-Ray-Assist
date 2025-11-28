@@ -1,12 +1,18 @@
 # eBay Blu-ray Listing Template Guide
 
 ## Overview
-The eBay template you provided is a bulk listing CSV file with **93 columns** designed for DVD/Blu-ray/Movie category listings. Here's everything you need to know to efficiently list your discounted Blu-rays.
+The eBay File Exchange template is a bulk listing CSV file for **Category 617** (DVDs & Blu-ray Discs). The template contains ~294 columns including metadata, required fields, and optional fields.
 
 ## Template Structure
-- **14 Required fields** (marked with `*`)
-- **27 Category-specific fields** for movies/Blu-rays (marked with `C:`)
-- **52 Optional fields** for pricing, shipping, images, and other details
+- **Row 1**: Header row with column names (includes eBay metadata columns)
+- **Row 2+**: Your listing data
+- **Required fields** are marked with `*` prefix
+- **Category-specific fields** are marked with `C:` prefix
+
+### Important Notes
+- The file uses UTF-8 with BOM encoding
+- Column 3 (`Template=fx_category_template_EBAY_US*Action(...)`) is where you put the Action value (`Add` for new listings)
+- Category ID is **617** (not 11232)
 
 ---
 
@@ -14,7 +20,7 @@ The eBay template you provided is a bulk listing CSV file with **93 columns** de
 
 ### Basic Listing Requirements
 1. **`*Action`** - Set to "Add" for new listings
-2. **`*Category`** - Use category ID for DVDs & Movies (likely 11232 or similar)
+2. **`*Category`** - Use category ID `617` for DVDs & Blu-ray Discs
 3. **`*Title`** - Your listing title (e.g., "The Dark Knight Blu-ray 2008 Christopher Nolan")
 4. **`*ConditionID`** - Condition codes:
    - `1000` = New
@@ -125,7 +131,7 @@ Here's a minimal viable template row for a typical Blu-ray:
 | Field | Example Value | Notes |
 |-------|---------------|-------|
 | `*Action` | Add | For new listings |
-| `*Category` | 11232 | DVD/Movie category |
+| `*Category` | 617 | DVDs & Blu-ray Discs |
 | `*Title` | The Dark Knight (Blu-ray, 2008) | Include format and year |
 | `*ConditionID` | 3000 | Used condition |
 | `*C:Format` | Blu-ray | Always "Blu-ray" |
